@@ -1,46 +1,71 @@
-# ESPRIT Study Agent
+# Studymate — ESPRIT AI Study Agent
 
-AI study assistant for ESPRIT students. Built with FastAPI + Groq + SvelteKit.
+AI study assistant for ESPRIT university students (Tunisia).  
+Built with **SvelteKit 5** + **FastAPI** + **Groq** + **Turso/SQLite** + **Better Auth**.
 
-## Setup
+## Quick Start
 
-### 1. Backend
+### Prerequisites
+- **Node.js** (v20+)
+- **Python 3.12+** (with `uv` or `pip`)
+- A free **Groq API key** from https://console.groq.com
+
+### 1. Backend (FastAPI)
 
 ```bash
 cd backend
-pip install -r requirements.txt
 cp .env.example .env
-# Add your GROQ_API_KEY in .env (get it free at console.groq.com)
-uvicorn main:app --reload
+# Edit .env and add your GROQ_API_KEY
+
+# Install & run:
+uv sync && uv run uvicorn main:app --reload
+# or pip install -r requirements.txt && uvicorn main:app --reload
 # Runs on http://localhost:8000
 ```
 
-### 2. Frontend
+### 2. Frontend (SvelteKit)
 
 ```bash
-cd frontend
+# From project root:
+cp .env.example .env
 npm install
 npm run dev
 # Runs on http://localhost:5173
 ```
 
-## Project Structure
+### 3. Open
+
+Visit **http://localhost:5173**, create an account, and start chatting!
+
+## Architecture
 
 ```
-esprit-agent/
+studymate/
 ├── backend/
-│   ├── main.py          # FastAPI app + Groq streaming
-│   ├── requirements.txt
-│   └── .env             # GROQ_API_KEY goes here
-└── frontend/
-    └── src/
-        └── routes/
-            └── +page.svelte  # Chat UI
+│   └── main.py                        # FastAPI + Groq streaming (port 8000)
+├── src/
+│   ├── routes/
+│   │   ├── +page.svelte               # Main chat UI
+│   │   ├── +layout.svelte             # Layout with NavBar
+│   │   ├── login/                     # Auth pages
+│   │   └── api/conversations/         # REST API for chat history
+│   ├── lib/
+│   │   ├── components/                # Chat UI components
+│   │   └── server/db/                 # Drizzle schema + auth
+│   └── hooks.server.ts                # Paraglide + Better Auth
+└── drizzle.config.ts                  # Drizzle ORM config (SQLite)
 ```
 
-## Next Steps
+## Features
 
-- [ ] Add chat history persistence (Neon DB)
-- [ ] Add RAG over ESPRIT course PDFs (LlamaIndex + ChromaDB)
-- [ ] Add auth (Better Auth)
-- [ ] Deploy (Cloudflare)
+- **Chat** — Streaming AI responses via Groq (Llama 3.1 8B)
+- **Auth** — Email/password registration & login (Better Auth)
+- **History** — Conversations & messages persisted to SQLite
+- **Multi-language** — AI responds in English, French, or Arabic
+- **ESPRIT-tuned** — System prompt tailored to Tunisian engineering curriculum
+
+## Phase 2 (planned)
+
+- RAG over ESPRIT course PDFs (ChromaDB)
+- Course browser & study planner
+- Exam practice generator

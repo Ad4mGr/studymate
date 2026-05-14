@@ -1,3 +1,50 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --color-esprit-50: #fef2f2;
+  --color-esprit-100: #fee2e2;
+  --color-esprit-200: #fecaca;
+  --color-esprit-300: #f87171;
+  --color-esprit-400: #ef4444;
+  --color-esprit-500: #dc2626;
+  --color-esprit-600: #b91c1c;
+  --color-esprit-700: #991b1b;
+  --color-esprit-800: #7f1d1d;
+  --color-esprit-900: #450a0a;
+
+  --color-dark-50: #f8fafc;
+  --color-dark-100: #f1f5f9;
+  --color-dark-200: #e2e8f0;
+  --color-dark-300: #cbd5e1;
+  --color-dark-400: #94a3b8;
+  --color-dark-500: #64748b;
+  --color-dark-600: #475569;
+  --color-dark-700: #334155;
+  --color-dark-800: #1e293b;
+  --color-dark-900: #0f172a;
+  --color-dark-950: #020617;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+
+body {
+  background: linear-gradient(160deg, #0a0a0f 0%, #0f0f1a 30%, #1a0a0a 100%);
+  color: #f1f5f9;
+}
+
+@keyframes pulse-dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
