@@ -46,6 +46,15 @@
 
 	<div class="flex items-center gap-3">
 		{#if user}
+			<a
+				href="/courses"
+				class="group relative text-xs uppercase tracking-wider text-[#64748b] transition hover:text-[#22d3ee]"
+			>
+				Materials
+				<span class="absolute -bottom-4 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded border border-[#1f1f1f] bg-[#0d0d12] px-2 py-1 text-[10px] text-[#64748b] opacity-0 transition group-hover:opacity-100 sm:block">
+					Upload &amp; manage course PDFs
+				</span>
+			</a>
 			<button
 				onclick={() => (historyOpen = !historyOpen)}
 				class="text-xs uppercase tracking-wider text-[#64748b] transition hover:text-[#22d3ee]"

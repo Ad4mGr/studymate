@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { Snippet } from 'svelte';
 
 	let {
 		disabled = false,
-		onSend = (_content: string) => {}
+		onSend = (_content: string) => {},
+		children
 	}: {
 		disabled?: boolean;
 		onSend: (content: string) => void;
+		children?: Snippet;
 	} = $props();
 
 	let inputEl: HTMLTextAreaElement;
@@ -39,9 +42,10 @@
 	});
 </script>
 
-<div class="fixed bottom-0 left-0 right-0 border-t border-[#22d3ee]/40 bg-[#111]">
+<div class="border-t border-[#22d3ee]/40 bg-[#111]">
 	<div class="mx-auto max-w-[680px] px-4 py-4">
 		<div class="flex items-end gap-2">
+			{@render children?.()}
 			<textarea
 				bind:this={inputEl}
 				bind:value

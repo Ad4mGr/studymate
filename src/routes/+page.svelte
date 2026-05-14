@@ -19,6 +19,13 @@
 		createdAt: string;
 	}
 
+	interface Course {
+		id: string;
+		name: string;
+		filename: string;
+		chunks: number;
+	}
+
 	let conversations = $state<Conversation[]>([]);
 	let activeId = $state<string>('');
 	let messages = $state<Message[]>([]);
@@ -26,8 +33,63 @@
 	let loading = $state(true);
 	let msgEnd: HTMLDivElement | undefined = $state();
 
+	let availableCourses = $state<Course[]>([]);
+	let attachedCourseIds = $state<string[]>([]);
+	let coursePickerOpen = $state(false);
+	let uploadName = $state('');
+	let uploadFile: File | null = $state(null);
+	let uploading = $state(false);
+	let uploadError = $state('');
+
 	if (!page.data.user) {
 		goto('/login');
+	}
+
+	async function loadCourses() {
+		const res = await fetch('http://localhost:8000/courses');
+		if (res.ok) availableCourses = await res.json();
+	}
+
+	const attachedCourses = $derived(availableCourses.filter((c) => attachedCourseIds.includes(c.id)));
+
+	function toggleCourse(id: string) {
+		if (attachedCourseIds.includes(id)) {
+			attachedCourseIds = attachedCourseIds.filter((c) => c !== id);
+		} else {
+			attachedCourseIds = [...attachedCourseIds, id];
+		}
+	}
+
+	async function uploadCourse() {
+		if (!uploadFile || !uploadName.trim()) return;
+		uploading = true;
+		uploadError = '';
+
+		const form = new FormData();
+		form.append('file', uploadFile);
+		form.append('name', uploadName.trim());
+
+		try {
+			const res = await fetch('http://localhost:8000/courses/upload', {
+				method: 'POST',
+				body: form
+			});
+			if (!res.ok) {
+				const err = await res.json();
+				uploadError = err.detail || 'Upload failed';
+			} else {
+				uploadName = '';
+				uploadFile = null;
+				const newCourse = await res.json();
+				availableCourses = [...availableCourses, newCourse];
+				attachedCourseIds = [...attachedCourseIds, newCourse.id];
+				coursePickerOpen = false;
+			}
+		} catch {
+			uploadError = 'Backend not running on port 8000';
+		} finally {
+			uploading = false;
+		}
 	}
 
 	async function loadConversations() {
@@ -120,7 +182,7 @@
 			const response = await fetch('http://localhost:8000/chat', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ messages: history })
+				body: JSON.stringify({ messages: history, course_ids: attachedCourseIds })
 			});
 
 			if (!response.ok || !response.body) {
@@ -129,20 +191,47 @@
 
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder();
-			let aiContent = '';
+			let raw = '';
 
 			const tempId = crypto.randomUUID();
 			messages = [...messages, { id: tempId, role: 'assistant', content: '', createdAt: new Date().toISOString() }];
 
+			let sourcesLine = '';
+
 			while (true) {
 				const { done, value } = await reader.read();
 				if (done) break;
-				aiContent += decoder.decode(value, { stream: true });
-				messages = messages.map((m) => (m.id === tempId ? { ...m, content: aiContent } : m));
+				raw += decoder.decode(value, { stream: true });
+
+				if (!sourcesLine) {
+					const nl = raw.indexOf('\n');
+					if (nl !== -1) {
+						sourcesLine = raw.slice(0, nl);
+						raw = raw.slice(nl + 1);
+					}
+				}
+
+				messages = messages.map((m) =>
+					m.id === tempId ? { ...m, content: raw } : m
+				);
 			}
 
-			await saveMessage(convId, 'assistant', aiContent);
+			let aiContent = raw;
+
+			if (sourcesLine) {
+				try {
+					const parsed = JSON.parse(sourcesLine);
+					if (parsed.sources?.length) {
+						const cite = parsed.sources.map((s: { filename: string }) => s.filename).join(', ');
+						aiContent += `\n\n— *Sources: ${cite}*`;
+					}
+				} catch {
+					aiContent = raw;
+				}
+			}
+
 			messages = messages.map((m) => (m.id === tempId ? { ...m, content: aiContent } : m));
+			await saveMessage(convId, 'assistant', aiContent);
 		} catch {
 			const errId = crypto.randomUUID();
 			messages = [
@@ -166,7 +255,7 @@
 	});
 
 	$effect(() => {
-		loadConversations().then(() => {
+		Promise.all([loadConversations(), loadCourses()]).then(() => {
 			loading = false;
 		});
 	});
@@ -224,5 +313,111 @@
 		{/if}
 	</div>
 
-	<ChatInput disabled={isStreaming} onSend={sendMessage} />
+	<div class="fixed bottom-0 left-0 right-0 z-30">
+		{#if attachedCourses.length > 0}
+			<div class="border-t border-[#22d3ee]/20 bg-[#0d0d12] px-4 py-2">
+				<div class="mx-auto flex max-w-[680px] flex-wrap items-center gap-2">
+					{#each attachedCourses as course}
+						<div class="flex items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1">
+							<span class="text-[11px] text-[#22d3ee]">{course.name}</span>
+							<button
+								onclick={() => toggleCourse(course.id)}
+								class="text-[10px] text-[#64748b] transition hover:text-[#22d3ee]"
+							>
+								✕
+							</button>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		<ChatInput disabled={isStreaming} onSend={sendMessage}>
+			<div class="relative shrink-0">
+				<button
+					onclick={() => (coursePickerOpen = !coursePickerOpen)}
+					class="flex h-8 w-8 items-center justify-center border border-[#1f1f1f] bg-[#0d0d12] text-[#64748b] transition hover:border-[#22d3ee] hover:text-[#22d3ee]"
+					title="Attach courses"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+					</svg>
+				</button>
+
+				{#if coursePickerOpen}
+					<div
+						class="fixed inset-0 z-30"
+						onclick={() => (coursePickerOpen = false)}
+						onkeydown={(e) => e.key === 'Escape' && (coursePickerOpen = false)}
+						role="button"
+						tabindex="-1"
+					></div>
+
+					<div class="absolute bottom-full left-0 mb-3 z-40 w-80 border border-[#1f1f1f] bg-[#0d0d12] shadow-xl">
+						<div class="border-b border-[#1f1f1f] px-4 py-3">
+							<p class="text-xs font-medium text-[#e2e8f0]">Course materials</p>
+							<p class="mt-1 text-[10px] text-[#475569]">Upload a PDF or select attached courses to use as AI context</p>
+						</div>
+
+						<div class="border-b border-[#1f1f1f] px-4 py-3">
+							<p class="mb-2 text-[10px] font-medium uppercase tracking-wider text-[#475569]">Upload new</p>
+							<div class="flex flex-col gap-2">
+								<input
+									type="text"
+									bind:value={uploadName}
+									placeholder="Course name (e.g. Java POO)"
+									style="caret-color:#22d3ee"
+									class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
+								/>
+								<div class="flex gap-2">
+									<label class="flex cursor-pointer items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#64748b] transition hover:border-[#22d3ee]">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+										</svg>
+										{uploadFile ? uploadFile.name : 'Choose PDF'}
+										<input type="file" accept=".pdf" class="hidden" onchange={(e) => { uploadFile = (e.target as HTMLInputElement).files?.[0] ?? null; }} />
+									</label>
+									<button
+										onclick={uploadCourse}
+										disabled={uploading || !uploadFile || !uploadName.trim()}
+										class="bg-[#22d3ee] px-3 py-1.5 text-xs font-medium text-[#0a0a0f] transition hover:bg-[#67e8f9] disabled:opacity-30"
+									>
+										{uploading ? 'Uploading...' : 'Upload'}
+									</button>
+								</div>
+								{#if uploadError}
+									<p class="text-[10px] text-[#22d3ee]">{uploadError}</p>
+								{/if}
+							</div>
+						</div>
+
+						<div class="max-h-48 overflow-y-auto">
+							{#if availableCourses.length === 0}
+								<p class="px-4 py-4 text-[10px] text-[#475569]">No courses uploaded yet — use the form above.</p>
+							{:else}
+								{#each availableCourses as course}
+									<button
+										onclick={() => toggleCourse(course.id)}
+										class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-xs transition hover:bg-[#1a1a1a]"
+									>
+										<div class="flex h-4 w-4 shrink-0 items-center justify-center border border-[#475569] {attachedCourseIds.includes(course.id) ? 'bg-[#22d3ee] border-[#22d3ee]' : ''}">
+											{#if attachedCourseIds.includes(course.id)}
+												<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-[#0a0a0f]" viewBox="0 0 20 20" fill="currentColor">
+													<path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+												</svg>
+											{/if}
+										</div>
+										<div class="flex-1 min-w-0">
+											<p class="text-[#e2e8f0] truncate">{course.name}</p>
+											<p class="text-[#475569] truncate">{course.filename} &middot; {course.chunks} chunks</p>
+										</div>
+									</button>
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+		</ChatInput>
+	</div>
 {/if}
