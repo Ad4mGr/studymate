@@ -1,13 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#dc2626"/>
-      <stop offset="100%" stop-color="#991b1b"/>
-    </linearGradient>
-  </defs>
-  <rect width="128" height="128" rx="24" fill="url(#g)"/>
-  <text x="64" y="86" font-family="system-ui,sans-serif" font-size="68" font-weight="800" fill="white" text-anchor="middle">E</text>
-  <path d="M24 92 Q64 74 104 92" stroke="rgba(255,255,255,0.6)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <circle cx="94" cy="38" r="6" fill="white"/>
-  <path d="M88 38 Q94 30 100 38" stroke="rgba(255,255,255,0.6)" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <rect width="128" height="128" rx="4" fill="#22d3ee"/>
+  <text x="64" y="88" font-family="system-ui,sans-serif" font-size="60" font-weight="700" fill="#0a0a0f" text-anchor="middle">E</text>
 </svg>
