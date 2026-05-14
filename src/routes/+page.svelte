@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { env } from '$env/dynamic/public';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import NavBar from '$lib/components/NavBar.svelte';
@@ -33,6 +34,8 @@
 	let loading = $state(true);
 	let msgEnd: HTMLDivElement | undefined = $state();
 
+	const apiUrl = env.PUBLIC_API_URL || 'http://localhost:8000';
+
 	let availableCourses = $state<Course[]>([]);
 	let attachedCourseIds = $state<string[]>([]);
 	let coursePickerOpen = $state(false);
@@ -46,7 +49,7 @@
 	}
 
 	async function loadCourses() {
-		const res = await fetch('http://localhost:8000/courses');
+		const res = await fetch(`${apiUrl}/courses`);
 		if (res.ok) availableCourses = await res.json();
 	}
 
@@ -70,7 +73,7 @@
 		form.append('name', uploadName.trim());
 
 		try {
-			const res = await fetch('http://localhost:8000/courses/upload', {
+			const res = await fetch(`${apiUrl}/courses/upload`, {
 				method: 'POST',
 				body: form
 			});
@@ -179,7 +182,7 @@
 		const history = [...messages.map((m) => ({ role: m.role, content: m.content }))];
 
 		try {
-			const response = await fetch('http://localhost:8000/chat', {
+			const response = await fetch(`${apiUrl}/chat`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ messages: history, course_ids: attachedCourseIds })

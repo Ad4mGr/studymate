@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { env } from '$env/dynamic/public';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+
+	const apiUrl = env.PUBLIC_API_URL || 'http://localhost:8000';
 
 	interface Course {
 		id: string;
@@ -20,7 +23,7 @@
 	if (!page.data.user) goto('/login');
 
 	async function loadCourses() {
-		const res = await fetch('http://localhost:8000/courses');
+		const res = await fetch(`${apiUrl}/courses`);
 		if (res.ok) courses = await res.json();
 		loading = false;
 	}
@@ -35,7 +38,7 @@
 		form.append('name', name.trim());
 
 		try {
-			const res = await fetch('http://localhost:8000/courses/upload', {
+			const res = await fetch(`${apiUrl}/courses/upload`, {
 				method: 'POST',
 				body: form
 			});
@@ -55,7 +58,7 @@
 	}
 
 	async function remove(courseId: string) {
-		await fetch(`http://localhost:8000/courses/${courseId}`, { method: 'DELETE' });
+		await fetch(`${apiUrl}/courses/${courseId}`, { method: 'DELETE' });
 		courses = courses.filter((c) => c.id !== courseId);
 	}
 
