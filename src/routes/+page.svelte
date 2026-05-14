@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { env } from '$env/dynamic/public';
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
 	import NavBar from '$lib/components/NavBar.svelte';
 	import MessageBubble from '$lib/components/MessageBubble.svelte';
 	import ChatInput from '$lib/components/ChatInput.svelte';
@@ -44,16 +43,14 @@
 	let uploading = $state(false);
 	let uploadError = $state('');
 
-	if (!page.data.user) {
-		goto('/login');
-	}
-
 	async function loadCourses() {
 		const res = await fetch(`${apiUrl}/courses`);
 		if (res.ok) availableCourses = await res.json();
 	}
 
-	const attachedCourses = $derived(availableCourses.filter((c) => attachedCourseIds.includes(c.id)));
+	const attachedCourses = $derived(
+		availableCourses.filter((c) => attachedCourseIds.includes(c.id))
+	);
 
 	function toggleCourse(id: string) {
 		if (attachedCourseIds.includes(id)) {
@@ -78,15 +75,12 @@
 				body: form
 			});
 			if (!res.ok) {
-				const err = await res.json();
+				const err = (await res.json()) as { detail?: string };
 				uploadError = err.detail || 'Upload failed';
 			} else {
 				uploadName = '';
 				uploadFile = null;
-				const newCourse = await res.json();
-				availableCourses = [...availableCourses, newCourse];
-				attachedCourseIds = [...attachedCourseIds, newCourse.id];
-				coursePickerOpen = false;
+				const newCourse = (await res.json()) as Course;
 			}
 		} catch {
 			uploadError = 'Backend not running on port 8000';
@@ -197,7 +191,10 @@
 			let raw = '';
 
 			const tempId = crypto.randomUUID();
-			messages = [...messages, { id: tempId, role: 'assistant', content: '', createdAt: new Date().toISOString() }];
+			messages = [
+				...messages,
+				{ id: tempId, role: 'assistant', content: '', createdAt: new Date().toISOString() }
+			];
 
 			let sourcesLine = '';
 
@@ -214,9 +211,7 @@
 					}
 				}
 
-				messages = messages.map((m) =>
-					m.id === tempId ? { ...m, content: raw } : m
-				);
+				messages = messages.map((m) => (m.id === tempId ? { ...m, content: raw } : m));
 			}
 
 			let aiContent = raw;
@@ -268,16 +263,18 @@
 	<div class="flex min-h-screen items-center justify-center">
 		<div class="flex items-center gap-2">
 			<span class="h-1 w-1 animate-pulse rounded-full bg-[#22d3ee]"></span>
-			<span class="h-1 w-1 animate-pulse rounded-full bg-[#22d3ee]" style="animation-delay: 0.16s"></span>
-			<span class="h-1 w-1 animate-pulse rounded-full bg-[#22d3ee]" style="animation-delay: 0.32s"></span>
+			<span class="h-1 w-1 animate-pulse rounded-full bg-[#22d3ee]" style="animation-delay: 0.16s"
+			></span>
+			<span class="h-1 w-1 animate-pulse rounded-full bg-[#22d3ee]" style="animation-delay: 0.32s"
+			></span>
 		</div>
 	</div>
 {:else}
-	<div class="mx-auto min-h-screen max-w-[680px] px-4 pb-36 pt-4">
+	<div class="mx-auto min-h-screen max-w-[680px] px-4 pt-4 pb-36">
 		<NavBar
 			user={page.data.user}
 			{conversations}
-			activeId={activeId}
+			{activeId}
 			onSelect={selectConversation}
 			onNew={newConversation}
 			onDelete={deleteConversation}
@@ -285,14 +282,16 @@
 
 		{#if !activeId}
 			<div class="flex flex-col items-center justify-center px-4 pt-32 text-center">
-				<h1 class="text-4xl font-light leading-tight tracking-tight text-[#e2e8f0] sm:text-5xl">
+				<h1 class="text-4xl leading-tight font-light tracking-tight text-[#e2e8f0] sm:text-5xl">
 					Ready to study,
 				</h1>
-				<h1 class="text-4xl font-bold italic leading-tight tracking-tight text-[#22d3ee] sm:text-5xl">
+				<h1
+					class="text-4xl leading-tight font-bold tracking-tight text-[#22d3ee] italic sm:text-5xl"
+				>
 					let's get into it.
 				</h1>
 				<div class="mt-10 flex flex-wrap justify-center gap-3">
-					{#each ['Explain Java inheritance', 'Help with SQL joins', 'Solve this algorithm', 'OSI model summary'] as prompt}
+					{#each ['Explain Java inheritance', 'Help with SQL joins', 'Solve this algorithm', 'OSI model summary'] as prompt (prompt)}
 						<button
 							onclick={async () => {
 								await newConversation();
@@ -309,18 +308,21 @@
 		{:else}
 			<div class="mt-6 space-y-8">
 				{#each messages as msg (msg.id)}
-					<MessageBubble message={msg} isStreaming={isStreaming && msg === messages[messages.length - 1]} />
+					<MessageBubble
+						message={msg}
+						isStreaming={isStreaming && msg === messages[messages.length - 1]}
+					/>
 				{/each}
 				<div bind:this={msgEnd}></div>
 			</div>
 		{/if}
 	</div>
 
-	<div class="fixed bottom-0 left-0 right-0 z-30">
+	<div class="fixed right-0 bottom-0 left-0 z-30">
 		{#if attachedCourses.length > 0}
 			<div class="border-t border-[#22d3ee]/20 bg-[#0d0d12] px-4 py-2">
 				<div class="mx-auto flex max-w-[680px] flex-wrap items-center gap-2">
-					{#each attachedCourses as course}
+					{#each attachedCourses as course (course.id)}
 						<div class="flex items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1">
 							<span class="text-[11px] text-[#22d3ee]">{course.name}</span>
 							<button
@@ -342,8 +344,19 @@
 					class="flex h-8 w-8 items-center justify-center border border-[#1f1f1f] bg-[#0d0d12] text-[#64748b] transition hover:border-[#22d3ee] hover:text-[#22d3ee]"
 					title="Attach courses"
 				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-3.5 w-3.5"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M12 4v16m8-8H4"
+						/>
 					</svg>
 				</button>
 
@@ -356,14 +369,20 @@
 						tabindex="-1"
 					></div>
 
-					<div class="absolute bottom-full left-0 mb-3 z-40 w-80 border border-[#1f1f1f] bg-[#0d0d12] shadow-xl">
+					<div
+						class="absolute bottom-full left-0 z-40 mb-3 w-80 border border-[#1f1f1f] bg-[#0d0d12] shadow-xl"
+					>
 						<div class="border-b border-[#1f1f1f] px-4 py-3">
 							<p class="text-xs font-medium text-[#e2e8f0]">Course materials</p>
-							<p class="mt-1 text-[10px] text-[#475569]">Upload a PDF or select attached courses to use as AI context</p>
+							<p class="mt-1 text-[10px] text-[#475569]">
+								Upload a PDF or select attached courses to use as AI context
+							</p>
 						</div>
 
 						<div class="border-b border-[#1f1f1f] px-4 py-3">
-							<p class="mb-2 text-[10px] font-medium uppercase tracking-wider text-[#475569]">Upload new</p>
+							<p class="mb-2 text-[10px] font-medium tracking-wider text-[#475569] uppercase">
+								Upload new
+							</p>
 							<div class="flex flex-col gap-2">
 								<input
 									type="text"
@@ -373,12 +392,32 @@
 									class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
 								/>
 								<div class="flex gap-2">
-									<label class="flex cursor-pointer items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#64748b] transition hover:border-[#22d3ee]">
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+									<label
+										class="flex cursor-pointer items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#64748b] transition hover:border-[#22d3ee]"
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											class="h-3 w-3"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+											/>
 										</svg>
 										{uploadFile ? uploadFile.name : 'Choose PDF'}
-										<input type="file" accept=".pdf" class="hidden" onchange={(e) => { uploadFile = (e.target as HTMLInputElement).files?.[0] ?? null; }} />
+										<input
+											type="file"
+											accept=".pdf"
+											class="hidden"
+											onchange={(e) => {
+												uploadFile = (e.target as HTMLInputElement).files?.[0] ?? null;
+											}}
+										/>
 									</label>
 									<button
 										onclick={uploadCourse}
@@ -396,23 +435,40 @@
 
 						<div class="max-h-48 overflow-y-auto">
 							{#if availableCourses.length === 0}
-								<p class="px-4 py-4 text-[10px] text-[#475569]">No courses uploaded yet — use the form above.</p>
+								<p class="px-4 py-4 text-[10px] text-[#475569]">
+									No courses uploaded yet — use the form above.
+								</p>
 							{:else}
-								{#each availableCourses as course}
+								{#each availableCourses as course (course.id)}
 									<button
 										onclick={() => toggleCourse(course.id)}
 										class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-xs transition hover:bg-[#1a1a1a]"
 									>
-										<div class="flex h-4 w-4 shrink-0 items-center justify-center border border-[#475569] {attachedCourseIds.includes(course.id) ? 'bg-[#22d3ee] border-[#22d3ee]' : ''}">
+										<div
+											class="flex h-4 w-4 shrink-0 items-center justify-center border border-[#475569] {attachedCourseIds.includes(
+												course.id
+											)
+												? 'border-[#22d3ee] bg-[#22d3ee]'
+												: ''}"
+										>
 											{#if attachedCourseIds.includes(course.id)}
-												<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-[#0a0a0f]" viewBox="0 0 20 20" fill="currentColor">
-													<path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													class="h-3 w-3 text-[#0a0a0f]"
+													viewBox="0 0 20 20"
+													fill="currentColor"
+												>
+													<path
+														d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+													/>
 												</svg>
 											{/if}
 										</div>
-										<div class="flex-1 min-w-0">
-											<p class="text-[#e2e8f0] truncate">{course.name}</p>
-											<p class="text-[#475569] truncate">{course.filename} &middot; {course.chunks} chunks</p>
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-[#e2e8f0]">{course.name}</p>
+											<p class="truncate text-[#475569]">
+												{course.filename} &middot; {course.chunks} chunks
+											</p>
 										</div>
 									</button>
 								{/each}
