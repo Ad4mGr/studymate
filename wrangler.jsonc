@@ -2,11 +2,14 @@
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "studymate",
 	"compatibility_date": "2026-05-14",
-	"compatibility_flags": ["nodejs_als"],
+	"compatibility_flags": ["nodejs_compat"],
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"assets": {
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
+	},
+	"vars": {
+		"TURSO_AUTH_TOKEN": ""
 	},
 	"workers_dev": true,
 	"preview_urls": true
