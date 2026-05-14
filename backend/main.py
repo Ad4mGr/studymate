@@ -31,8 +31,8 @@ You help students with:
 - Operating systems, computer architecture, cybersecurity
 
 Be concise, clear, and practical. When explaining code, always use examples with proper formatting.
-You can respond in English, French, or Arabic depending on what the student uses.
-Tunisian students often code-switch between French, Arabic, and English — adapt naturally."""
+
+IMPORTANT: Always respond in English unless the student explicitly writes to you in French or Arabic. If they write in French, respond in French. If they write in Arabic, respond in Arabic. Otherwise, default to English."""
 
 
 class Message(BaseModel):
