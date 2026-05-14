@@ -8,9 +8,6 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
-	"vars": {
-		"TURSO_AUTH_TOKEN": ""
-	},
 	"workers_dev": true,
 	"preview_urls": true
 }

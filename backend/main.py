@@ -1,17 +1,17 @@
-import os
 import json
+import os
 import uuid
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from groq import Groq
 from pydantic import BaseModel
 
 from rag.processor import process_pdf
-from rag.vector_store import add_chunks, delete_by_course, get_course_chunk_count
 from rag.retriever import build_rag_prompt
+from rag.vector_store import add_chunks, delete_by_course, get_course_chunk_count
 
 load_dotenv()
 
@@ -98,14 +98,20 @@ async def chat(request: ChatRequest):
         (m.content for m in reversed(request.messages) if m.role == "user"), ""
     )
 
-    rag_prompt, sources = build_rag_prompt(last_user_msg, course_ids=request.course_ids or None)
+    rag_prompt, sources = build_rag_prompt(
+        last_user_msg, course_ids=request.course_ids or None
+    )
 
     def generate():
         yield json.dumps({"sources": sources}) + "\n"
 
         if rag_prompt:
             streaming_messages = [
-                *([{"role": "system", "content": SYSTEM_PROMPT}] if not rag_prompt else []),
+                *(
+                    [{"role": "system", "content": SYSTEM_PROMPT}]
+                    if not rag_prompt
+                    else []
+                ),
                 *(m.model_dump() for m in request.messages),
             ]
         else:
@@ -145,7 +151,9 @@ async def upload_course(file: UploadFile = File(...), name: str = Form(...)):
     with open(saved_path, "wb") as f:
         f.write(content)
 
-    documents, embeddings, metadatas, ids = process_pdf(saved_path, course_id, file.filename)
+    documents, embeddings, metadatas, ids = process_pdf(
+        saved_path, course_id, file.filename
+    )
 
     add_chunks(documents, embeddings, metadatas, ids)
 
