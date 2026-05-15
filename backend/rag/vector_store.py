@@ -30,11 +30,14 @@ def add_chunks(documents: list[str], embeddings: list[list[float]], metadatas: l
     col.add(documents=documents, embeddings=embeddings, metadatas=metadatas, ids=ids)
 
 
-def search(query_embedding: list[float], n_results: int = 5, course_ids: list[str] | None = None) -> list[dict]:
+def search(query_embedding: list[float], n_results: int = 5, course_ids: list[str] | None = None, user_id: str | None = None) -> list[dict]:
     col = get_collection()
-    where_filter = None
+    conditions = []
     if course_ids:
-        where_filter = {"course_id": {"$in": course_ids}}
+        conditions.append({"course_id": {"$in": course_ids}})
+    if user_id:
+        conditions.append({"user_id": user_id})
+    where_filter = {"$and": conditions} if len(conditions) > 1 else (conditions[0] if conditions else None)
     results = col.query(query_embeddings=[query_embedding], n_results=n_results, where=where_filter)
     output = []
     for i in range(len(results["ids"][0])):

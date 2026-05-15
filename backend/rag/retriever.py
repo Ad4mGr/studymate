@@ -4,9 +4,9 @@ from .embeddings import embed
 MAX_CONTEXT_CHARS = 3000
 
 
-def build_context(query: str, course_ids: list[str] | None = None, n_results: int = 5) -> tuple[str, list[dict]]:
+def build_context(query: str, course_ids: list[str] | None = None, user_id: str | None = None, n_results: int = 5) -> tuple[str, list[dict]]:
     query_embedding = embed(query)
-    results = vector_store.search(query_embedding, n_results=n_results, course_ids=course_ids)
+    results = vector_store.search(query_embedding, n_results=n_results, course_ids=course_ids, user_id=user_id)
 
     if not results:
         return "", []
@@ -40,8 +40,8 @@ def build_context(query: str, course_ids: list[str] | None = None, n_results: in
     return context, sources
 
 
-def build_rag_prompt(query: str, course_ids: list[str] | None = None) -> tuple[str, list[dict]]:
-    context, sources = build_context(query, course_ids=course_ids)
+def build_rag_prompt(query: str, course_ids: list[str] | None = None, user_id: str | None = None) -> tuple[str, list[dict]]:
+    context, sources = build_context(query, course_ids=course_ids, user_id=user_id)
 
     if not context:
         return "", sources

@@ -55,6 +55,7 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[Message]
     course_ids: list[str] = []
+    user_id: str = ""
 
 
 def load_courses_index() -> dict:
@@ -99,7 +100,7 @@ async def chat(request: ChatRequest):
     )
 
     rag_prompt, sources = build_rag_prompt(
-        last_user_msg, course_ids=request.course_ids or None
+        last_user_msg, course_ids=request.course_ids or None, user_id=request.user_id or None
     )
 
     def generate():
@@ -139,7 +140,7 @@ async def chat(request: ChatRequest):
 
 
 @app.post("/courses/upload")
-async def upload_course(file: UploadFile = File(...), name: str = Form(...)):
+async def upload_course(file: UploadFile = File(...), name: str = Form(...), user_id: str = Form(...)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(400, "Only PDF files are supported")
 
@@ -155,6 +156,9 @@ async def upload_course(file: UploadFile = File(...), name: str = Form(...)):
         saved_path, course_id, file.filename
     )
 
+    for m in metadatas:
+        m["user_id"] = user_id
+
     add_chunks(documents, embeddings, metadatas, ids)
 
     index = load_courses_index()
@@ -164,6 +168,7 @@ async def upload_course(file: UploadFile = File(...), name: str = Form(...)):
         "filename": file.filename,
         "filepath": saved_path,
         "chunks": len(documents),
+        "user_id": user_id,
     }
     save_courses_index(index)
 
@@ -176,26 +181,30 @@ async def upload_course(file: UploadFile = File(...), name: str = Form(...)):
 
 
 @app.get("/courses")
-async def list_courses():
+async def list_courses(user_id: str):
     index = load_courses_index()
     courses = []
     for cid, data in index.items():
-        courses.append(
-            {
-                "id": cid,
-                "name": data.get("name", cid),
-                "filename": data.get("filename", ""),
-                "chunks": data.get("chunks", 0),
-            }
-        )
+        if data.get("user_id") == user_id:
+            courses.append(
+                {
+                    "id": cid,
+                    "name": data.get("name", cid),
+                    "filename": data.get("filename", ""),
+                    "chunks": data.get("chunks", 0),
+                }
+            )
     return sorted(courses, key=lambda c: c["name"])
 
 
 @app.delete("/courses/{course_id}")
-async def delete_course(course_id: str):
+async def delete_course(course_id: str, user_id: str):
     index = load_courses_index()
     if course_id not in index:
         raise HTTPException(404, "Course not found")
+
+    if index[course_id].get("user_id") != user_id:
+        raise HTTPException(403, "You do not have permission to delete this course")
 
     filepath = index[course_id].get("filepath", "")
     if filepath and os.path.exists(filepath):

@@ -44,7 +44,9 @@
 	let uploadError = $state('');
 
 	async function loadCourses() {
-		const res = await fetch(`${apiUrl}/courses`);
+		const userId = page.data.user?.id;
+		if (!userId) return;
+		const res = await fetch(`${apiUrl}/courses?user_id=${userId}`);
 		if (res.ok) availableCourses = await res.json();
 	}
 
@@ -68,6 +70,7 @@
 		const form = new FormData();
 		form.append('file', uploadFile);
 		form.append('name', uploadName.trim());
+		form.append('user_id', page.data.user?.id ?? '');
 
 		try {
 			const res = await fetch(`${apiUrl}/courses/upload`, {
@@ -179,7 +182,7 @@
 			const response = await fetch(`${apiUrl}/chat`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ messages: history, course_ids: attachedCourseIds })
+				body: JSON.stringify({ messages: history, course_ids: attachedCourseIds, user_id: page.data.user?.id })
 			});
 
 			if (!response.ok || !response.body) {

@@ -23,7 +23,9 @@
 	if (!page.data.user) goto('/login');
 
 	async function loadCourses() {
-		const res = await fetch(`${apiUrl}/courses`);
+		const userId = page.data.user?.id;
+		if (!userId) return;
+		const res = await fetch(`${apiUrl}/courses?user_id=${userId}`);
 		if (res.ok) courses = await res.json();
 		loading = false;
 	}
@@ -36,6 +38,7 @@
 		const form = new FormData();
 		form.append('file', file);
 		form.append('name', name.trim());
+		form.append('user_id', page.data.user?.id ?? '');
 
 		try {
 			const res = await fetch(`${apiUrl}/courses/upload`, {
@@ -58,7 +61,9 @@
 	}
 
 	async function remove(courseId: string) {
-		await fetch(`${apiUrl}/courses/${courseId}`, { method: 'DELETE' });
+		const userId = page.data.user?.id;
+		if (!userId) return;
+		await fetch(`${apiUrl}/courses/${courseId}?user_id=${userId}`, { method: 'DELETE' });
 		courses = courses.filter((c) => c.id !== courseId);
 	}
 
