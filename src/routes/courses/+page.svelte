@@ -20,17 +20,46 @@
 		name: string;
 		filename: string;
 		chunks: number;
+		tags: string[];
+		created_at: number;
+	}
+
+	interface PreviewData {
+		id: string;
+		name: string;
+		filename: string;
+		chunks: number;
+		tags: string[];
+		preview: { content: string; metadata: Record<string, unknown> }[];
 	}
 
 	let courses = $state<Course[]>([]);
+	let allTags = $state<string[]>([]);
 	let loading = $state(true);
 	let uploading = $state(false);
 	let name = $state('');
+	let tags = $state('');
 	let file: File | null = $state(null);
 	let error = $state('');
 	let dragOver = $state(false);
+	let searchQuery = $state('');
+	let selectedTag = $state('');
+	let previewCourse = $state<PreviewData | null>(null);
+	let previewLoading = $state(false);
+	let exportLoading = $state<string | null>(null);
+	let importModalOpen = $state(false);
+	let importJson = $state('');
+	let importError = $state('');
 
 	if (!page.data.user) goto('/login');
+
+	const filteredCourses = $derived(
+		courses.filter((c) => {
+			const matchesSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.filename.toLowerCase().includes(searchQuery.toLowerCase());
+			const matchesTag = !selectedTag || c.tags.includes(selectedTag);
+			return matchesSearch && matchesTag;
+		})
+	);
 
 	async function loadCourses() {
 		if (!backendToken) return;
@@ -41,6 +70,14 @@
 		loading = false;
 	}
 
+	async function loadTags() {
+		if (!backendToken) return;
+		const res = await fetch(`${apiUrl}/courses/tags`, {
+			headers: { 'Authorization': `Bearer ${backendToken}` }
+		});
+		if (res.ok) allTags = await res.json();
+	}
+
 	async function upload() {
 		if (!file || !name.trim() || !backendToken) return;
 		uploading = true;
@@ -49,6 +86,7 @@
 		const form = new FormData();
 		form.append('file', file);
 		form.append('name', name.trim());
+		form.append('tags', tags.trim());
 
 		try {
 			const res = await fetch(`${apiUrl}/courses/upload`, {
@@ -61,8 +99,9 @@
 				error = err.detail || 'Upload failed';
 			} else {
 				name = '';
+				tags = '';
 				file = null;
-				await loadCourses();
+				await Promise.all([loadCourses(), loadTags()]);
 			}
 		} catch {
 			error = 'Make sure the backend is running on port 8000';
@@ -80,9 +119,65 @@
 		courses = courses.filter((c) => c.id !== courseId);
 	}
 
+	async function preview(courseId: string) {
+		previewLoading = true;
+		previewCourse = null;
+		const res = await fetch(`${apiUrl}/courses/${courseId}/preview`, {
+			headers: { 'Authorization': `Bearer ${backendToken}` }
+		});
+		if (res.ok) previewCourse = await res.json();
+		previewLoading = false;
+	}
+
+	async function exportCourse(courseId: string) {
+		exportLoading = courseId;
+		const res = await fetch(`${apiUrl}/courses/${courseId}/export`, {
+			headers: { 'Authorization': `Bearer ${backendToken}` }
+		});
+		if (res.ok) {
+			const data = await res.json();
+			const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `${data.name.replace(/\s+/g, '_')}_export.json`;
+			a.click();
+			URL.revokeObjectURL(url);
+		}
+		exportLoading = null;
+	}
+
+	async function importCourse() {
+		importError = '';
+		try {
+			const data = JSON.parse(importJson);
+			const res = await fetch(`${apiUrl}/courses/import`, {
+				method: 'POST',
+				headers: {
+					'Authorization': `Bearer ${backendToken}`,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(data)
+			});
+			if (res.ok) {
+				importModalOpen = false;
+				importJson = '';
+				await loadCourses();
+			} else {
+				const err = await res.json() as { detail?: string };
+				importError = err.detail || 'Import failed';
+			}
+		} catch {
+			importError = 'Invalid JSON';
+		}
+	}
+
 	$effect(() => {
 		if (page.data.user) {
-			getBackendToken().then(() => loadCourses());
+			getBackendToken().then(() => {
+				loadCourses();
+				loadTags();
+			});
 		}
 	});
 </script>
@@ -94,10 +189,16 @@
 			<h1 class="mt-3 text-2xl font-light tracking-tight text-[#e2e8f0]">Course materials</h1>
 			<p class="mt-1 text-xs text-[#64748b]">Upload ESPRIT course PDFs to power the AI assistant</p>
 		</div>
+		<button
+			onclick={() => (importModalOpen = true)}
+			class="border border-[#1f1f1f] px-3 py-1.5 text-xs text-[#64748b] transition hover:border-[#22d3ee] hover:text-[#22d3ee]"
+		>
+			Import
+		</button>
 	</div>
 
 	<div
-		class="mb-8 border border-dashed border-[#1f1f1f] bg-[#0d0d12] px-6 py-6 transition {dragOver ? 'border-[#22d3ee] bg-[#22d3ee]/5' : ''}"
+		class="mb-6 border border-dashed border-[#1f1f1f] bg-[#0d0d12] px-6 py-6 transition {dragOver ? 'border-[#22d3ee] bg-[#22d3ee]/5' : ''}"
 		ondragover={(e) => { e.preventDefault(); dragOver = true; }}
 		ondragleave={() => (dragOver = false)}
 		ondrop={(e) => {
@@ -106,6 +207,8 @@
 			const f = e.dataTransfer?.files?.[0];
 			if (f?.type === 'application/pdf') file = f;
 		}}
+		role="region"
+		aria-label="Upload PDF drop zone"
 	>
 		<h2 class="mb-4 text-sm font-medium text-[#e2e8f0]">Upload a PDF</h2>
 		<div class="flex flex-col gap-3 sm:flex-row">
@@ -115,6 +218,13 @@
 				placeholder="Course name (e.g. Java POO)"
 				style="caret-color: #22d3ee"
 				class="flex-1 border border-[#1f1f1f] bg-[#0a0a0f] px-3 py-2 text-sm text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none focus:ring-0"
+			/>
+			<input
+				type="text"
+				bind:value={tags}
+				placeholder="Tags (comma-separated)"
+				style="caret-color: #22d3ee"
+				class="w-full sm:w-40 border border-[#1f1f1f] bg-[#0a0a0f] px-3 py-2 text-sm text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none focus:ring-0"
 			/>
 			<label class="flex cursor-pointer items-center gap-2 border border-[#1f1f1f] bg-[#0a0a0f] px-3 py-2 text-sm text-[#64748b] transition hover:border-[#22d3ee] hover:text-[#22d3ee]">
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -136,26 +246,134 @@
 		{/if}
 	</div>
 
+	{#if allTags.length > 0}
+		<div class="mb-4 flex flex-wrap gap-2">
+			<button
+				onclick={() => (selectedTag = '')}
+				class="border px-2 py-1 text-[11px] transition {selectedTag === '' ? 'border-[#22d3ee] bg-[#22d3ee]/10 text-[#22d3ee]' : 'border-[#1f1f1f] text-[#64748b] hover:border-[#22d3ee]'}"
+			>
+				All
+			</button>
+			{#each allTags as tag (tag)}
+				<button
+					onclick={() => (selectedTag = tag)}
+					class="border px-2 py-1 text-[11px] transition {selectedTag === tag ? 'border-[#22d3ee] bg-[#22d3ee]/10 text-[#22d3ee]' : 'border-[#1f1f1f] text-[#64748b] hover:border-[#22d3ee]'}"
+				>
+					{tag}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
+	<div class="mb-4">
+		<input
+			type="text"
+			bind:value={searchQuery}
+			placeholder="Search courses..."
+			style="caret-color: #22d3ee"
+			class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-3 py-2 text-sm text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none focus:ring-0"
+		/>
+	</div>
+
 	{#if loading}
 		<p class="text-xs text-[#475569]">Loading courses...</p>
-	{:else if courses.length === 0}
-		<p class="text-xs text-[#475569]">No course materials uploaded yet.</p>
+	{:else if filteredCourses.length === 0}
+		<p class="text-xs text-[#475569]">{courses.length === 0 ? 'No course materials uploaded yet.' : 'No courses match your filters.'}</p>
 	{:else}
 		<div class="space-y-2">
-			{#each courses as course}
+			{#each filteredCourses as course (course.id)}
 				<div class="flex items-center justify-between border border-[#1f1f1f] bg-[#0d0d12] px-4 py-3">
-					<div>
+					<div class="min-w-0 flex-1">
 						<p class="text-sm text-[#e2e8f0]">{course.name}</p>
 						<p class="text-xs text-[#64748b]">{course.filename} &middot; {course.chunks} chunks</p>
+						{#if course.tags.length > 0}
+							<div class="mt-1 flex flex-wrap gap-1">
+								{#each course.tags as tag (tag)}
+									<span class="rounded border border-[#1f1f1f] bg-[#0a0a0f] px-1.5 py-0.5 text-[10px] text-[#22d3ee]">{tag}</span>
+								{/each}
+							</div>
+						{/if}
 					</div>
-					<button
-						onclick={() => remove(course.id)}
-						class="text-xs text-[#64748b] transition hover:text-[#22d3ee]"
-					>
-						Delete
-					</button>
+					<div class="flex shrink-0 items-center gap-2">
+						<button
+							onclick={() => preview(course.id)}
+							class="text-xs text-[#64748b] transition hover:text-[#22d3ee]"
+							title="Preview"
+						>
+							Preview
+						</button>
+						<button
+							onclick={() => exportCourse(course.id)}
+							class="text-xs text-[#64748b] transition hover:text-[#22d3ee]"
+							title="Export"
+						>
+							{exportLoading === course.id ? '...' : 'Export'}
+						</button>
+						<button
+							onclick={() => remove(course.id)}
+							class="text-xs text-[#64748b] transition hover:text-[#22d3ee]"
+						>
+							Delete
+						</button>
+					</div>
 				</div>
 			{/each}
 		</div>
 	{/if}
 </div>
+
+{#if previewCourse || previewLoading}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick={() => (previewCourse = null)}>
+		<div class="mx-4 w-full max-w-lg border border-[#1f1f1f] bg-[#0d0d12] p-6" onclick={(e) => e.stopPropagation()}>
+			<div class="mb-4 flex items-center justify-between">
+				<h3 class="text-lg font-medium text-[#e2e8f0]">{previewCourse?.name || 'Loading...'}</h3>
+				<button onclick={() => (previewCourse = null)} class="text-[#64748b] transition hover:text-[#22d3ee]">✕</button>
+			</div>
+			{#if previewLoading}
+				<p class="text-xs text-[#475569]">Loading preview...</p>
+			{:else if previewCourse}
+				<p class="mb-3 text-xs text-[#64748b]">{previewCourse.chunks} chunks &middot; {previewCourse.filename}</p>
+				{#if previewCourse.tags.length > 0}
+					<div class="mb-3 flex flex-wrap gap-1">
+						{#each previewCourse.tags as tag (tag)}
+							<span class="rounded border border-[#1f1f1f] bg-[#0a0a0f] px-1.5 py-0.5 text-[10px] text-[#22d3ee]">{tag}</span>
+						{/each}
+					</div>
+				{/if}
+				<div class="max-h-80 space-y-3 overflow-y-auto">
+					{#each previewCourse.preview as chunk (chunk.content.slice(0, 50))}
+						<div class="border border-[#1f1f1f] bg-[#0a0a0f] p-3">
+							<p class="whitespace-pre-wrap text-xs leading-relaxed text-[#e2e8f0]">{chunk.content}...</p>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	</div>
+{/if}
+
+{#if importModalOpen}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick={() => (importModalOpen = false)}>
+		<div class="mx-4 w-full max-w-lg border border-[#1f1f1f] bg-[#0d0d12] p-6" onclick={(e) => e.stopPropagation()}>
+			<div class="mb-4 flex items-center justify-between">
+				<h3 class="text-lg font-medium text-[#e2e8f0]">Import Course</h3>
+				<button onclick={() => (importModalOpen = false)} class="text-[#64748b] transition hover:text-[#22d3ee]">✕</button>
+			</div>
+			<textarea
+				bind:value={importJson}
+				placeholder="Paste exported course JSON here..."
+				class="mb-3 h-40 w-full border border-[#1f1f1f] bg-[#0a0a0f] px-3 py-2 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none focus:ring-0"
+			></textarea>
+			{#if importError}
+				<p class="mb-3 text-xs text-[#22d3ee]">{importError}</p>
+			{/if}
+			<button
+				onclick={importCourse}
+				disabled={!importJson.trim()}
+				class="w-full bg-[#22d3ee] py-2 text-sm font-medium text-[#0a0a0f] transition hover:bg-[#67e8f9] disabled:opacity-30"
+			>
+				Import
+			</button>
+		</div>
+	</div>
+{/if}

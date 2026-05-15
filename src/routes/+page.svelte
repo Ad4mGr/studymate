@@ -24,6 +24,7 @@
 		name: string;
 		filename: string;
 		chunks: number;
+		tags: string[];
 	}
 
 	let conversations = $state<Conversation[]>([]);
@@ -48,7 +49,9 @@
 	let availableCourses = $state<Course[]>([]);
 	let attachedCourseIds = $state<string[]>([]);
 	let coursePickerOpen = $state(false);
+	let coursePickerSearch = $state('');
 	let uploadName = $state('');
+	let uploadTags = $state('');
 	let uploadFile: File | null = $state(null);
 	let uploading = $state(false);
 	let uploadError = $state('');
@@ -63,6 +66,17 @@
 
 	const attachedCourses = $derived(
 		availableCourses.filter((c) => attachedCourseIds.includes(c.id))
+	);
+
+	const filteredPickerCourses = $derived(
+		!coursePickerSearch.trim()
+			? availableCourses
+			: availableCourses.filter(
+					(c) =>
+						c.name.toLowerCase().includes(coursePickerSearch.toLowerCase()) ||
+						c.filename.toLowerCase().includes(coursePickerSearch.toLowerCase()) ||
+						c.tags?.some((t) => t.toLowerCase().includes(coursePickerSearch.toLowerCase()))
+				)
 	);
 
 	function toggleCourse(id: string) {
@@ -81,6 +95,7 @@
 		const form = new FormData();
 		form.append('file', uploadFile);
 		form.append('name', uploadName.trim());
+		form.append('tags', uploadTags.trim());
 
 		try {
 			const res = await fetch(`${apiUrl}/courses/upload`, {
@@ -93,6 +108,7 @@
 				uploadError = err.detail || 'Upload failed';
 			} else {
 				uploadName = '';
+				uploadTags = '';
 				uploadFile = null;
 				const newCourse = (await res.json()) as Course;
 			}
@@ -397,6 +413,16 @@
 							</p>
 						</div>
 
+						<div class="border-b border-[#1f1f1f] px-4 py-2">
+							<input
+								type="text"
+								bind:value={coursePickerSearch}
+								placeholder="Search courses or tags..."
+								style="caret-color:#22d3ee"
+								class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
+							/>
+						</div>
+
 						<div class="border-b border-[#1f1f1f] px-4 py-3">
 							<p class="mb-2 text-[10px] font-medium tracking-wider text-[#475569] uppercase">
 								Upload new
@@ -406,6 +432,13 @@
 									type="text"
 									bind:value={uploadName}
 									placeholder="Course name (e.g. Java POO)"
+									style="caret-color:#22d3ee"
+									class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
+								/>
+								<input
+									type="text"
+									bind:value={uploadTags}
+									placeholder="Tags (comma-separated)"
 									style="caret-color:#22d3ee"
 									class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
 								/>
@@ -452,12 +485,12 @@
 						</div>
 
 						<div class="max-h-48 overflow-y-auto">
-							{#if availableCourses.length === 0}
+							{#if filteredPickerCourses.length === 0}
 								<p class="px-4 py-4 text-[10px] text-[#475569]">
-									No courses uploaded yet — use the form above.
+									{availableCourses.length === 0 ? 'No courses uploaded yet — use the form above.' : 'No courses match your search.'}
 								</p>
 							{:else}
-								{#each availableCourses as course (course.id)}
+								{#each filteredPickerCourses as course (course.id)}
 									<button
 										onclick={() => toggleCourse(course.id)}
 										class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-xs transition hover:bg-[#1a1a1a]"
@@ -487,6 +520,13 @@
 											<p class="truncate text-[#475569]">
 												{course.filename} &middot; {course.chunks} chunks
 											</p>
+											{#if course.tags?.length > 0}
+												<div class="mt-0.5 flex flex-wrap gap-0.5">
+													{#each course.tags as tag (tag)}
+														<span class="rounded border border-[#1f1f1f] bg-[#0a0a0f] px-1 py-px text-[9px] text-[#22d3ee]">{tag}</span>
+													{/each}
+												</div>
+											{/if}
 										</div>
 									</button>
 								{/each}

@@ -19,6 +19,26 @@
 
 	let historyOpen = $state(false);
 	let userMenuOpen = $state(false);
+	let searchQuery = $state('');
+	let searchResults = $state<{ id: string; title: string }[]>([]);
+	let searching = $state(false);
+
+	async function searchConversations() {
+		if (!searchQuery.trim()) {
+			searchResults = [];
+			return;
+		}
+		searching = true;
+		const res = await fetch(`/api/conversations/search?q=${encodeURIComponent(searchQuery)}`);
+		if (res.ok) {
+			searchResults = await res.json();
+		}
+		searching = false;
+	}
+
+	const displayConversations = $derived(
+		searchQuery.trim() ? searchResults : conversations
+	);
 
 	function getInitials(name: string) {
 		return name
@@ -139,11 +159,24 @@
 			</div>
 		</div>
 
-		<div class="h-[calc(100%-57px)] overflow-y-auto px-3 py-3">
-			{#if conversations.length === 0}
-				<p class="px-2 text-xs text-[#475569]">No conversations yet.</p>
+		<div class="border-b border-[#1a1a1a] px-4 py-3">
+			<input
+				type="text"
+				bind:value={searchQuery}
+				oninput={searchConversations}
+				placeholder="Search conversations..."
+				style="caret-color: #22d3ee"
+				class="w-full border border-[#1f1f1f] bg-[#0d0d12] px-3 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none focus:ring-0"
+			/>
+		</div>
+
+		<div class="h-[calc(100%-110px)] overflow-y-auto px-3 py-3">
+			{#if searching}
+				<p class="px-2 text-xs text-[#475569]">Searching...</p>
+			{:else if displayConversations.length === 0}
+				<p class="px-2 text-xs text-[#475569]">{searchQuery.trim() ? 'No results found.' : 'No conversations yet.'}</p>
 			{:else}
-				{#each conversations as conv (conv.id)}
+				{#each displayConversations as conv (conv.id)}
 					<div class="group flex items-center justify-between px-3 py-2.5 transition hover:bg-[#111]">
 						<button
 							onclick={() => { onSelect(conv.id); historyOpen = false; }}
