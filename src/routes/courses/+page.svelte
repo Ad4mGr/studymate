@@ -429,9 +429,11 @@
 						>
 							Delete
 						</button>
+					</div>
+				</div>
+			{/each}
 		</div>
-	</div>
-{/if}
+	{/if}
 
 {#if quizModalOpen}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick={closeQuiz}>
@@ -505,7 +507,6 @@
 		</div>
 	</div>
 {/if}
-</div>
 
 {#if previewCourse || previewLoading}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick={() => (previewCourse = null)}>
