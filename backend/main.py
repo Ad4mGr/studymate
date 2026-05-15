@@ -516,6 +516,279 @@ async def get_course_tags(req: Request):
     return result
 
 
+@app.get("/courses/{course_id}/flashcards")
+async def generate_flashcards(course_id: str, req: Request):
+    user_id = verify_jwt(req)
+
+    index = load_courses_index()
+    if course_id not in index:
+        raise HTTPException(404, "Course not found")
+
+    if index[course_id].get("user_id") != user_id:
+        raise HTTPException(403, "You do not have permission to access this course")
+
+    try:
+        from rag.vector_store import get_collection
+        col = get_collection()
+        results = col.get(
+            where={"course_id": course_id},
+            limit=10,
+            include=["documents"]
+        )
+
+        if not results or not results["documents"] or len(results["documents"]) < 3:
+            raise HTTPException(400, "Not enough content in this course to generate flashcards. Upload more material.")
+
+        context = "\n\n---\n\n".join(results["documents"][:10])
+
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": """You are a tutor. Extract exactly 10 key concepts from the provided text and return them as a JSON array of objects with 'front' (question) and 'back' (answer) properties.
+
+Rules:
+- Return ONLY valid JSON, no markdown, no explanation
+- Each object must have exactly two fields: "front" and "back"
+- "front" should be a question or term
+- "back" should be the answer or definition
+- Keep answers concise (1-3 sentences max)
+- Return exactly 10 flashcards"""},
+                {"role": "user", "content": f"Generate flashcards from this course material:\n\n{context}"}
+            ],
+            temperature=0.3,
+            max_tokens=2048,
+        )
+
+        content = response.choices[0].message.content
+
+        text = content.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        if text.startswith("json"):
+            text = text[4:].strip()
+
+        flashcards = json.loads(text)
+
+        if not isinstance(flashcards, list) or len(flashcards) == 0:
+            raise HTTPException(500, "Failed to generate valid flashcards")
+
+        return {"flashcards": flashcards[:10], "course_id": course_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to generate flashcards: {str(e)}")
+
+
+QUIZ_SESSIONS: dict[str, dict] = {}
+
+
+@app.post("/courses/{course_id}/quiz")
+async def start_quiz(course_id: str, req: Request):
+    user_id = verify_jwt(req)
+
+    index = load_courses_index()
+    if course_id not in index:
+        raise HTTPException(404, "Course not found")
+
+    if index[course_id].get("user_id") != user_id:
+        raise HTTPException(403, "You do not have permission to access this course")
+
+    try:
+        from rag.vector_store import get_collection
+        col = get_collection()
+        results = col.get(
+            where={"course_id": course_id},
+            limit=15,
+            include=["documents"]
+        )
+
+        if not results or not results["documents"] or len(results["documents"]) < 3:
+            raise HTTPException(400, "Not enough content in this course to generate a quiz.")
+
+        context = "\n\n---\n\n".join(results["documents"][:15])
+
+        session_id = uuid.uuid4().hex[:16]
+        QUIZ_SESSIONS[session_id] = {
+            "user_id": user_id,
+            "course_id": course_id,
+            "context": context,
+            "course_name": index[course_id].get("name", ""),
+            "score": 0,
+            "total": 0,
+            "current_question": 0,
+            "max_questions": 5,
+            "answers": [],
+            "history": [],
+        }
+
+        first_question = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": f"""You are a Quiz Master for the course "{index[course_id].get('name', '')}".
+
+Rules:
+1. Ask ONE question at a time based on the course material
+2. Questions should test understanding, not just recall
+3. Mix question types: definitions, concepts, applications
+4. After the user answers, evaluate as Correct, Incorrect, or Partial
+5. Give a brief explanation for the correct answer
+6. Then ask the next question
+7. After 5 questions, output a final summary in this JSON format:
+{{"quiz_complete": true, "score": X, "total": 5, "feedback": "Review concept X..."}}
+
+Start with question 1 now. Ask only the question, nothing else."""},
+                {"role": "user", "content": f"Course material:\n\n{context}\n\nAsk question 1."}
+            ],
+            temperature=0.7,
+            max_tokens=512,
+        )
+
+        question = first_question.choices[0].message.content.strip()
+        QUIZ_SESSIONS[session_id]["history"].append({"role": "assistant", "content": question})
+        QUIZ_SESSIONS[session_id]["current_question"] = 1
+
+        return {
+            "session_id": session_id,
+            "question": question,
+            "question_number": 1,
+            "total_questions": 5,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to start quiz: {str(e)}")
+
+
+@app.post("/courses/{course_id}/quiz/{session_id}/answer")
+async def answer_quiz(course_id: str, session_id: str, req: Request):
+    user_id = verify_jwt(req)
+
+    if session_id not in QUIZ_SESSIONS:
+        raise HTTPException(404, "Quiz session not found or expired")
+
+    session = QUIZ_SESSIONS[session_id]
+    if session["user_id"] != user_id:
+        raise HTTPException(403, "This quiz session belongs to another user")
+
+    if session["course_id"] != course_id:
+        raise HTTPException(400, "Course ID mismatch")
+
+    try:
+        body = await req.json()
+        user_answer = body.get("answer", "")
+
+        if not user_answer.strip():
+            raise HTTPException(400, "Answer cannot be empty")
+
+        session["history"].append({"role": "user", "content": user_answer})
+
+        is_last = session["current_question"] >= session["max_questions"]
+
+        system_prompt = f"""You are evaluating a student's answer to a quiz question.
+
+Evaluate the answer as:
+- "correct" if the answer is accurate
+- "incorrect" if the answer is wrong
+- "partial" if the answer has some correct elements but is incomplete
+
+Provide:
+1. evaluation: "correct", "incorrect", or "partial"
+2. explanation: a brief explanation of the correct answer (2-3 sentences)
+3. next_question: the next quiz question (ONLY if this is not the last question)
+
+If this is question {session["max_questions"]} of {session["max_questions"]}, output a final summary in JSON:
+{{"quiz_complete": true, "score": X, "total": {session["max_questions"]}, "feedback": "Review concept X..."}}
+
+Current question: {session["current_question"]}/{session["max_questions"]}"""
+
+        if is_last:
+            system_prompt += "\n\nThis is the LAST question. After evaluating, output the quiz_complete JSON summary."
+        else:
+            system_prompt += f"\n\nAfter evaluating, ask question {session['current_question'] + 1}."
+
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                *session["history"],
+            ],
+            temperature=0.3,
+            max_tokens=1024,
+        )
+
+        result = response.choices[0].message.content.strip()
+
+        evaluation = "partial"
+        explanation = result
+        next_question = None
+        quiz_complete = None
+
+        if "quiz_complete" in result.lower():
+            import re
+            json_match = re.search(r'\{[^}]*"quiz_complete"[^}]*\}', result, re.DOTALL)
+            if json_match:
+                try:
+                    quiz_complete = json.loads(json_match.group())
+                except json.JSONDecodeError:
+                    pass
+
+            eval_match = re.search(r'(?:evaluation|correct|incorrect|partial)[:\s]*(correct|incorrect|partial)', result, re.IGNORECASE)
+            if eval_match:
+                evaluation = eval_match.group(1).lower()
+
+            exp_match = re.search(r'(?:explanation)[:\s]*(.*?)(?:\n\n|\nnext_question|$)', result, re.IGNORECASE | re.DOTALL)
+            if exp_match:
+                explanation = exp_match.group(1).strip()
+        else:
+            eval_match = re.search(r'(?:evaluation)[:\s]*(correct|incorrect|partial)', result, re.IGNORECASE)
+            if eval_match:
+                evaluation = eval_match.group(1).lower()
+
+            exp_match = re.search(r'(?:explanation)[:\s]*(.*?)(?:\n\n|\nnext_question|$)', result, re.IGNORECASE | re.DOTALL)
+            if exp_match:
+                explanation = exp_match.group(1).strip()
+
+            q_match = re.search(r'(?:next_question)[:\s]*(.*?)(?:\n\n|$)', result, re.IGNORECASE | re.DOTALL)
+            if q_match:
+                next_question = q_match.group(1).strip()
+            else:
+                parts = result.split("\n\n")
+                if len(parts) > 1:
+                    next_question = parts[-1].strip()
+
+        if evaluation == "correct":
+            session["score"] += 1
+        session["total"] += 1
+
+        session["answers"].append({
+            "question_number": session["current_question"],
+            "evaluation": evaluation,
+            "explanation": explanation,
+        })
+
+        if next_question:
+            session["history"].append({"role": "assistant", "content": next_question})
+            session["current_question"] += 1
+
+        return {
+            "session_id": session_id,
+            "evaluation": evaluation,
+            "explanation": explanation,
+            "next_question": next_question,
+            "score": session["score"],
+            "total": session["total"],
+            "quiz_complete": quiz_complete is not None,
+            "summary": quiz_complete,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to process answer: {str(e)}")
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

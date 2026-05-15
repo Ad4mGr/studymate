@@ -50,6 +50,21 @@
 	let importModalOpen = $state(false);
 	let importJson = $state('');
 	let importError = $state('');
+	let quizModalOpen = $state(false);
+	let quizCourseId = $state('');
+	let quizCourseName = $state('');
+	let quizSessionId = $state('');
+	let quizQuestion = $state('');
+	let quizAnswer = $state('');
+	let quizScore = $state(0);
+	let quizTotal = $state(0);
+	let quizQuestionNum = $state(0);
+	let quizComplete = $state(false);
+	let quizSummary = $state<{ score: number; total: number; feedback: string } | null>(null);
+	let quizLoading = $state(false);
+	let quizError = $state('');
+	let quizEvaluation = $state('');
+	let quizExplanation = $state('');
 
 	if (!page.data.user) goto('/login');
 
@@ -170,6 +185,91 @@
 		} catch {
 			importError = 'Invalid JSON';
 		}
+	}
+
+	async function startQuiz(courseId: string, courseName: string) {
+		quizCourseId = courseId;
+		quizCourseName = courseName;
+		quizModalOpen = true;
+		quizLoading = true;
+		quizError = '';
+		quizComplete = false;
+		quizSummary = null;
+		quizScore = 0;
+		quizTotal = 0;
+		quizQuestionNum = 0;
+		quizEvaluation = '';
+		quizExplanation = '';
+		quizAnswer = '';
+
+		const res = await fetch(`${apiUrl}/courses/${courseId}/quiz`, {
+			method: 'POST',
+			headers: { 'Authorization': `Bearer ${backendToken}` }
+		});
+
+		if (res.ok) {
+			const data = await res.json();
+			quizSessionId = data.session_id;
+			quizQuestion = data.question;
+			quizQuestionNum = data.question_number;
+		} else {
+			const err = await res.json() as { detail?: string };
+			quizError = err.detail || 'Failed to start quiz';
+		}
+		quizLoading = false;
+	}
+
+	async function submitQuizAnswer() {
+		if (!quizAnswer.trim() || !quizSessionId) return;
+		quizLoading = true;
+		quizEvaluation = '';
+		quizExplanation = '';
+
+		const res = await fetch(`${apiUrl}/courses/${quizCourseId}/quiz/${quizSessionId}/answer`, {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${backendToken}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ answer: quizAnswer })
+		});
+
+		if (res.ok) {
+			const data = await res.json();
+			quizEvaluation = data.evaluation;
+			quizExplanation = data.explanation;
+			quizScore = data.score;
+			quizTotal = data.total;
+
+			if (data.quiz_complete) {
+				quizComplete = true;
+				quizSummary = data.summary;
+			} else {
+				quizQuestion = data.next_question;
+				quizQuestionNum = quizTotal + 1;
+				quizAnswer = '';
+			}
+		} else {
+			const err = await res.json() as { detail?: string };
+			quizError = err.detail || 'Failed to submit answer';
+		}
+		quizLoading = false;
+	}
+
+	function closeQuiz() {
+		quizModalOpen = false;
+		quizSessionId = '';
+		quizQuestion = '';
+		quizAnswer = '';
+		quizScore = 0;
+		quizTotal = 0;
+		quizQuestionNum = 0;
+		quizComplete = false;
+		quizSummary = null;
+		quizLoading = false;
+		quizError = '';
+		quizEvaluation = '';
+		quizExplanation = '';
 	}
 
 	$effect(() => {
@@ -302,6 +402,20 @@
 						>
 							Preview
 						</button>
+						<a
+							href="/courses/{course.id}/flashcards"
+							class="text-xs text-[#64748b] transition hover:text-[#22d3ee]"
+							title="Flashcards"
+						>
+							Flashcards
+						</a>
+						<button
+							onclick={() => startQuiz(course.id, course.name)}
+							class="text-xs text-[#64748b] transition hover:text-[#22d3ee]"
+							title="Quiz"
+						>
+							Quiz
+						</button>
 						<button
 							onclick={() => exportCourse(course.id)}
 							class="text-xs text-[#64748b] transition hover:text-[#22d3ee]"
@@ -315,11 +429,82 @@
 						>
 							Delete
 						</button>
-					</div>
-				</div>
-			{/each}
 		</div>
-	{/if}
+	</div>
+{/if}
+
+{#if quizModalOpen}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick={closeQuiz}>
+		<div class="mx-4 w-full max-w-lg border border-[#1f1f1f] bg-[#0d0d12] p-6" onclick={(e) => e.stopPropagation()}>
+			<div class="mb-4 flex items-center justify-between">
+				<div>
+					<h3 class="text-lg font-medium text-[#e2e8f0]">Quiz: {quizCourseName}</h3>
+					{#if !quizComplete}
+						<p class="text-xs text-[#64748b]">Question {quizQuestionNum}/5 &middot; Score: {quizScore}/{quizTotal}</p>
+					{/if}
+				</div>
+				<button onclick={closeQuiz} class="text-[#64748b] transition hover:text-[#22d3ee]">✕</button>
+			</div>
+
+			{#if quizLoading && !quizQuestion}
+				<p class="text-xs text-[#475569]">Starting quiz...</p>
+			{:else if quizError}
+				<p class="text-xs text-[#22d3ee]">{quizError}</p>
+				<button onclick={() => startQuiz(quizCourseId, quizCourseName)} class="mt-3 border border-[#22d3ee] px-4 py-1.5 text-xs text-[#22d3ee] transition hover:bg-[#22d3ee]/10">Retry</button>
+			{:else if quizComplete && quizSummary}
+				<div class="space-y-4">
+					<div class="rounded-lg border border-[#22d3ee]/30 bg-[#22d3ee]/5 p-4 text-center">
+						<p class="text-3xl font-bold text-[#22d3ee]">{quizSummary.score}/{quizSummary.total}</p>
+						<p class="mt-1 text-xs text-[#64748b]">Final Score</p>
+					</div>
+					{#if quizSummary.feedback}
+						<div class="rounded-lg border border-[#1f1f1f] bg-[#0a0a0f] p-3">
+							<p class="text-xs text-[#e2e8f0]">{quizSummary.feedback}</p>
+						</div>
+					{/if}
+					<button onclick={closeQuiz} class="w-full bg-[#22d3ee] py-2 text-sm font-medium text-[#0a0a0f] transition hover:bg-[#67e8f9]">Close</button>
+				</div>
+			{:else if quizQuestion}
+				<div class="space-y-4">
+					{#if quizEvaluation}
+						<div class="rounded-lg border {quizEvaluation === 'correct' ? 'border-green-500/30 bg-green-500/5' : quizEvaluation === 'incorrect' ? 'border-red-500/30 bg-red-500/5' : 'border-yellow-500/30 bg-yellow-500/5'} p-3">
+							<p class="text-xs font-medium {quizEvaluation === 'correct' ? 'text-green-400' : quizEvaluation === 'incorrect' ? 'text-red-400' : 'text-yellow-400'}">{quizEvaluation === 'correct' ? '✓ Correct!' : quizEvaluation === 'incorrect' ? '✗ Incorrect' : '~ Partial'}</p>
+							<p class="mt-1 text-xs text-[#e2e8f0]">{quizExplanation}</p>
+						</div>
+					{/if}
+
+					<div class="rounded-lg border border-[#1f1f1f] bg-[#0a0a0f] p-4">
+						<p class="text-sm text-[#e2e8f0]">{quizQuestion}</p>
+					</div>
+
+					{#if !quizEvaluation}
+						<textarea
+							bind:value={quizAnswer}
+							placeholder="Type your answer..."
+							style="caret-color: #22d3ee"
+							class="h-24 w-full border border-[#1f1f1f] bg-[#0a0a0f] px-3 py-2 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none focus:ring-0"
+						></textarea>
+						<button
+							onclick={submitQuizAnswer}
+							disabled={quizLoading || !quizAnswer.trim()}
+							class="w-full bg-[#22d3ee] py-2 text-sm font-medium text-[#0a0a0f] transition hover:bg-[#67e8f9] disabled:opacity-30"
+						>
+							{quizLoading ? 'Submitting...' : 'Submit Answer'}
+						</button>
+					{:else}
+						<button
+							onclick={submitQuizAnswer}
+							disabled={quizLoading}
+							class="w-full bg-[#22d3ee] py-2 text-sm font-medium text-[#0a0a0f] transition hover:bg-[#67e8f9] disabled:opacity-30"
+						>
+							{quizLoading ? 'Loading...' : 'Next Question'}
+						</button>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	</div>
+{/if}
 </div>
 
 {#if previewCourse || previewLoading}
