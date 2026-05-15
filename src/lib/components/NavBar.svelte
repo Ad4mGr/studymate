@@ -111,6 +111,13 @@
 						>
 							Profile
 						</a>
+						<a
+							href="/legal"
+							onclick={() => (userMenuOpen = false)}
+							class="flex items-center gap-2 px-3 py-1.5 text-sm text-[#64748b] transition hover:text-[#e2e8f0]"
+						>
+							Terms &amp; Privacy
+						</a>
 						<button
 							onclick={handleSignOut}
 							class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[#64748b] transition hover:text-[#e2e8f0]"
@@ -160,14 +167,16 @@
 		</div>
 
 		<div class="border-b border-[#1a1a1a] px-4 py-3">
-			<input
-				type="text"
-				bind:value={searchQuery}
-				oninput={searchConversations}
-				placeholder="Search conversations..."
-				style="caret-color: #22d3ee"
-				class="w-full border border-[#1f1f1f] bg-[#0d0d12] px-3 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none focus:ring-0"
-			/>
+			<div class="mx-auto max-w-[220px]">
+				<input
+					type="text"
+					bind:value={searchQuery}
+					oninput={searchConversations}
+					placeholder="Search conversations..."
+					style="caret-color: #22d3ee"
+					class="w-full border border-[#1f1f1f] bg-[#0d0d12] px-3 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none focus:ring-0"
+				/>
+			</div>
 		</div>
 
 		<div class="h-[calc(100%-110px)] overflow-y-auto px-3 py-3">
