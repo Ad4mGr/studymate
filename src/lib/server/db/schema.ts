@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
 
 export const task = sqliteTable('task', {
 	id: text('id')
@@ -20,7 +20,10 @@ export const conversation = sqliteTable('conversation', {
 	updatedAt: text('updated_at')
 		.notNull()
 		.$defaultFn(() => new Date().toISOString())
-});
+}, (table) => ({
+	userIdIdx: index('conversation_user_id_idx').on(table.userId),
+	updatedAtIdx: index('conversation_updated_at_idx').on(table.updatedAt),
+}));
 
 export const message = sqliteTable('message', {
 	id: text('id')
@@ -32,6 +35,8 @@ export const message = sqliteTable('message', {
 	createdAt: text('created_at')
 		.notNull()
 		.$defaultFn(() => new Date().toISOString())
-});
+}, (table) => ({
+	conversationIdIdx: index('message_conversation_id_idx').on(table.conversationId),
+}));
 
 export * from './auth.schema';

@@ -17,11 +17,12 @@ export async function GET(event) {
 export async function PATCH(event) {
 	if (!event.locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
 	const body: { title?: string } = await event.request.json();
-	await db
+	const now = new Date().toISOString();
+	const [conv] = await db
 		.update(conversation)
-		.set({ title: body.title, updatedAt: new Date().toISOString() })
-		.where(and(eq(conversation.id, event.params.id), eq(conversation.userId, event.locals.user.id)));
-	const [conv] = await db.select().from(conversation).where(eq(conversation.id, event.params.id)).limit(1);
+		.set({ title: body.title, updatedAt: now })
+		.where(and(eq(conversation.id, event.params.id), eq(conversation.userId, event.locals.user.id)))
+		.returning();
 	if (!conv) return json({ error: 'Not found' }, { status: 404 });
 	return json(conv);
 }
