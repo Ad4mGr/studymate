@@ -35,6 +35,16 @@
 
 	const apiUrl = env.PUBLIC_API_URL || 'http://localhost:8000';
 
+	let backendToken = $state<string>('');
+
+	async function getBackendToken() {
+		const res = await fetch('/api/backend-token');
+		if (res.ok) {
+			const data = await res.json() as { token: string };
+			backendToken = data.token;
+		}
+	}
+
 	let availableCourses = $state<Course[]>([]);
 	let attachedCourseIds = $state<string[]>([]);
 	let coursePickerOpen = $state(false);
@@ -44,9 +54,10 @@
 	let uploadError = $state('');
 
 	async function loadCourses() {
-		const userId = page.data.user?.id;
-		if (!userId) return;
-		const res = await fetch(`${apiUrl}/courses?user_id=${userId}`);
+		if (!backendToken) return;
+		const res = await fetch(`${apiUrl}/courses`, {
+			headers: { 'Authorization': `Bearer ${backendToken}` }
+		});
 		if (res.ok) availableCourses = await res.json();
 	}
 
@@ -63,18 +74,18 @@
 	}
 
 	async function uploadCourse() {
-		if (!uploadFile || !uploadName.trim()) return;
+		if (!uploadFile || !uploadName.trim() || !backendToken) return;
 		uploading = true;
 		uploadError = '';
 
 		const form = new FormData();
 		form.append('file', uploadFile);
 		form.append('name', uploadName.trim());
-		form.append('user_id', page.data.user?.id ?? '');
 
 		try {
 			const res = await fetch(`${apiUrl}/courses/upload`, {
 				method: 'POST',
+				headers: { 'Authorization': `Bearer ${backendToken}` },
 				body: form
 			});
 			if (!res.ok) {
@@ -181,8 +192,11 @@
 		try {
 			const response = await fetch(`${apiUrl}/chat`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ messages: history, course_ids: attachedCourseIds, user_id: page.data.user?.id })
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${backendToken}`
+				},
+				body: JSON.stringify({ messages: history, course_ids: attachedCourseIds })
 			});
 
 			if (!response.ok || !response.body) {
@@ -256,7 +270,8 @@
 	});
 
 	$effect(() => {
-		Promise.all([loadConversations(), loadCourses()]).then(() => {
+		Promise.all([loadConversations(), getBackendToken()]).then(() => {
+			loadCourses();
 			loading = false;
 		});
 	});

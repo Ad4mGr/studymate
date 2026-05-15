@@ -5,6 +5,16 @@
 
 	const apiUrl = env.PUBLIC_API_URL || 'http://localhost:8000';
 
+	let backendToken = $state<string>('');
+
+	async function getBackendToken() {
+		const res = await fetch('/api/backend-token');
+		if (res.ok) {
+			const data = await res.json() as { token: string };
+			backendToken = data.token;
+		}
+	}
+
 	interface Course {
 		id: string;
 		name: string;
@@ -23,30 +33,31 @@
 	if (!page.data.user) goto('/login');
 
 	async function loadCourses() {
-		const userId = page.data.user?.id;
-		if (!userId) return;
-		const res = await fetch(`${apiUrl}/courses?user_id=${userId}`);
+		if (!backendToken) return;
+		const res = await fetch(`${apiUrl}/courses`, {
+			headers: { 'Authorization': `Bearer ${backendToken}` }
+		});
 		if (res.ok) courses = await res.json();
 		loading = false;
 	}
 
 	async function upload() {
-		if (!file || !name.trim()) return;
+		if (!file || !name.trim() || !backendToken) return;
 		uploading = true;
 		error = '';
 
 		const form = new FormData();
 		form.append('file', file);
 		form.append('name', name.trim());
-		form.append('user_id', page.data.user?.id ?? '');
 
 		try {
 			const res = await fetch(`${apiUrl}/courses/upload`, {
 				method: 'POST',
+				headers: { 'Authorization': `Bearer ${backendToken}` },
 				body: form
 			});
 			if (!res.ok) {
-				const err = await res.json();
+				const err = await res.json() as { detail?: string };
 				error = err.detail || 'Upload failed';
 			} else {
 				name = '';
@@ -61,14 +72,18 @@
 	}
 
 	async function remove(courseId: string) {
-		const userId = page.data.user?.id;
-		if (!userId) return;
-		await fetch(`${apiUrl}/courses/${courseId}?user_id=${userId}`, { method: 'DELETE' });
+		if (!backendToken) return;
+		await fetch(`${apiUrl}/courses/${courseId}`, {
+			method: 'DELETE',
+			headers: { 'Authorization': `Bearer ${backendToken}` }
+		});
 		courses = courses.filter((c) => c.id !== courseId);
 	}
 
 	$effect(() => {
-		if (page.data.user) loadCourses();
+		if (page.data.user) {
+			getBackendToken().then(() => loadCourses());
+		}
 	});
 </script>
 

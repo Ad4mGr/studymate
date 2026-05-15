@@ -13,4 +13,6 @@ dependencies = [
     "sentence-transformers>=2.2.0",
     "PyMuPDF>=1.23.0",
     "python-multipart>=0.0.9",
+    "PyJWT>=2.8.0",
+    "slowapi>=0.1.9",
 ]
