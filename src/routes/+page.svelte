@@ -304,7 +304,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="mx-auto min-h-screen max-w-[680px] px-4 pt-4 pb-36">
+	<div class="mx-auto min-h-screen max-w-[680px] px-4 pt-4">
 		<NavBar
 			user={page.data.user}
 			{conversations}
@@ -340,7 +340,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="mt-6 space-y-8">
+			<div class="mt-6 space-y-8 pb-40">
 				{#each messages as msg (msg.id)}
 					<MessageBubble
 						message={msg}
@@ -352,25 +352,26 @@
 		{/if}
 	</div>
 
-	<div class="fixed right-0 bottom-0 left-0 z-30">
-		{#if attachedCourses.length > 0}
-			<div class="border-t border-[#22d3ee]/20 bg-[#0d0d12] px-4 py-2">
-				<div class="mx-auto flex max-w-[680px] flex-wrap items-center gap-2">
-					{#each attachedCourses as course (course.id)}
-						<div class="flex items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1">
-							<span class="text-[11px] text-[#22d3ee]">{course.name}</span>
-							<button
-								onclick={() => toggleCourse(course.id)}
-								class="text-[10px] text-[#64748b] transition hover:text-[#22d3ee]"
-							>
-								✕
-							</button>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{/if}
+	{#if !activeId}
+		<div class="fixed inset-0 z-20 flex items-end justify-center px-4 pb-8 pointer-events-none">
+			<div class="pointer-events-auto w-full max-w-[520px]">
+				{#if attachedCourses.length > 0}
+					<div class="mb-2 flex flex-wrap gap-2">
+						{#each attachedCourses as course (course.id)}
+							<div class="flex items-center gap-1.5 border border-[#1f1f1f] bg-[#0d0d12] px-2.5 py-1">
+								<span class="text-[11px] text-[#22d3ee]">{course.name}</span>
+								<button
+									onclick={() => toggleCourse(course.id)}
+									class="text-[10px] text-[#64748b] transition hover:text-[#22d3ee]"
+								>
+									✕
+								</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
 
+				<div class="rounded-xl border border-[#1f1f1f] bg-[#111] px-4 py-3">
 		<ChatInput disabled={isStreaming} onSend={sendMessage}>
 			<div class="relative shrink-0">
 				<button
@@ -394,147 +395,342 @@
 					</svg>
 				</button>
 
-				{#if coursePickerOpen}
-					<div
-						class="fixed inset-0 z-30"
-						onclick={() => (coursePickerOpen = false)}
-						onkeydown={(e) => e.key === 'Escape' && (coursePickerOpen = false)}
-						role="button"
-						tabindex="-1"
-					></div>
+							{#if coursePickerOpen}
+								<div
+									class="fixed inset-0 z-30"
+									onclick={() => (coursePickerOpen = false)}
+									onkeydown={(e) => e.key === 'Escape' && (coursePickerOpen = false)}
+									role="button"
+									tabindex="-1"
+								></div>
 
-					<div
-						class="absolute bottom-full left-0 z-40 mb-3 w-80 border border-[#1f1f1f] bg-[#0d0d12] shadow-xl"
-					>
-						<div class="border-b border-[#1f1f1f] px-4 py-3">
-							<p class="text-xs font-medium text-[#e2e8f0]">Course materials</p>
-							<p class="mt-1 text-[10px] text-[#475569]">
-								Upload a PDF or select attached courses to use as AI context
-							</p>
-						</div>
+								<div
+									class="absolute bottom-full left-0 z-40 mb-3 w-80 border border-[#1f1f1f] bg-[#0d0d12] shadow-xl"
+								>
+									<div class="border-b border-[#1f1f1f] px-4 py-3">
+										<p class="text-xs font-medium text-[#e2e8f0]">Course materials</p>
+										<p class="mt-1 text-[10px] text-[#475569]">
+											Upload a PDF or select attached courses to use as AI context
+										</p>
+									</div>
 
-						<div class="border-b border-[#1f1f1f] px-4 py-2">
-							<input
-								type="text"
-								bind:value={coursePickerSearch}
-								placeholder="Search courses or tags..."
-								style="caret-color:#22d3ee"
-								class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
-							/>
-						</div>
-
-						<div class="border-b border-[#1f1f1f] px-4 py-3">
-							<p class="mb-2 text-[10px] font-medium tracking-wider text-[#475569] uppercase">
-								Upload new
-							</p>
-							<div class="flex flex-col gap-2">
-								<input
-									type="text"
-									bind:value={uploadName}
-									placeholder="Course name (e.g. Java POO)"
-									style="caret-color:#22d3ee"
-									class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
-								/>
-								<input
-									type="text"
-									bind:value={uploadTags}
-									placeholder="Tags (comma-separated)"
-									style="caret-color:#22d3ee"
-									class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
-								/>
-								<div class="flex gap-2">
-									<label
-										class="flex cursor-pointer items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#64748b] transition hover:border-[#22d3ee]"
-									>
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											class="h-3 w-3"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-											/>
-										</svg>
-										{uploadFile ? uploadFile.name : 'Choose PDF'}
+									<div class="border-b border-[#1f1f1f] px-4 py-2">
 										<input
-											type="file"
-											accept=".pdf"
-											class="hidden"
-											onchange={(e) => {
-												uploadFile = (e.target as HTMLInputElement).files?.[0] ?? null;
-											}}
+											type="text"
+											bind:value={coursePickerSearch}
+											placeholder="Search courses or tags..."
+											style="caret-color:#22d3ee"
+											class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
 										/>
-									</label>
-									<button
-										onclick={uploadCourse}
-										disabled={uploading || !uploadFile || !uploadName.trim()}
-										class="bg-[#22d3ee] px-3 py-1.5 text-xs font-medium text-[#0a0a0f] transition hover:bg-[#67e8f9] disabled:opacity-30"
-									>
-										{uploading ? 'Uploading...' : 'Upload'}
-									</button>
+									</div>
+
+									<div class="border-b border-[#1f1f1f] px-4 py-3">
+										<p class="mb-2 text-[10px] font-medium tracking-wider text-[#475569] uppercase">
+											Upload new
+										</p>
+										<div class="flex flex-col gap-2">
+											<input
+												type="text"
+												bind:value={uploadName}
+												placeholder="Course name (e.g. Java POO)"
+												style="caret-color:#22d3ee"
+												class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
+											/>
+											<input
+												type="text"
+												bind:value={uploadTags}
+												placeholder="Tags (comma-separated)"
+												style="caret-color:#22d3ee"
+												class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
+											/>
+											<div class="flex gap-2">
+												<label
+													class="flex cursor-pointer items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#64748b] transition hover:border-[#22d3ee]"
+												>
+													<svg
+														xmlns="http://www.w3.org/2000/svg"
+														class="h-3 w-3"
+														fill="none"
+														viewBox="0 0 24 24"
+														stroke="currentColor"
+													>
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+														/>
+													</svg>
+													{uploadFile ? uploadFile.name : 'Choose PDF'}
+													<input
+														type="file"
+														accept=".pdf"
+														class="hidden"
+														onchange={(e) => {
+															uploadFile = (e.target as HTMLInputElement).files?.[0] ?? null;
+														}}
+													/>
+												</label>
+												<button
+													onclick={uploadCourse}
+													disabled={uploading || !uploadFile || !uploadName.trim()}
+													class="bg-[#22d3ee] px-3 py-1.5 text-xs font-medium text-[#0a0a0f] transition hover:bg-[#67e8f9] disabled:opacity-30"
+												>
+													{uploading ? 'Uploading...' : 'Upload'}
+												</button>
+											</div>
+											{#if uploadError}
+												<p class="text-[10px] text-[#22d3ee]">{uploadError}</p>
+											{/if}
+										</div>
+									</div>
+
+									<div class="max-h-48 overflow-y-auto">
+										{#if filteredPickerCourses.length === 0}
+											<p class="px-4 py-4 text-[10px] text-[#475569]">
+												{availableCourses.length === 0 ? 'No courses uploaded yet — use the form above.' : 'No courses match your search.'}
+											</p>
+										{:else}
+											{#each filteredPickerCourses as course (course.id)}
+												<button
+													onclick={() => toggleCourse(course.id)}
+													class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-xs transition hover:bg-[#1a1a1a]"
+												>
+													<div
+														class="flex h-4 w-4 shrink-0 items-center justify-center border border-[#475569] {attachedCourseIds.includes(
+															course.id
+														)
+															? 'border-[#22d3ee] bg-[#22d3ee]'
+															: ''}"
+													>
+														{#if attachedCourseIds.includes(course.id)}
+															<svg
+																xmlns="http://www.w3.org/2000/svg"
+																class="h-3 w-3 text-[#0a0a0f]"
+																viewBox="0 0 20 20"
+																fill="currentColor"
+															>
+																<path
+																	d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+																/>
+															</svg>
+														{/if}
+													</div>
+													<div class="min-w-0 flex-1">
+														<p class="truncate text-[#e2e8f0]">{course.name}</p>
+														<p class="truncate text-[#475569]">
+															{course.filename} &middot; {course.chunks} chunks
+														</p>
+														{#if course.tags?.length > 0}
+															<div class="mt-0.5 flex flex-wrap gap-0.5">
+																{#each course.tags as tag (tag)}
+																	<span class="rounded border border-[#1f1f1f] bg-[#0a0a0f] px-1 py-px text-[9px] text-[#22d3ee]">{tag}</span>
+																{/each}
+															</div>
+														{/if}
+													</div>
+												</button>
+											{/each}
+										{/if}
+									</div>
 								</div>
-								{#if uploadError}
-									<p class="text-[10px] text-[#22d3ee]">{uploadError}</p>
+							{/if}
+						</div>
+					</ChatInput>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if activeId}
+		<div class="fixed right-0 bottom-0 left-0 z-30">
+			{#if attachedCourses.length > 0}
+				<div class="border-t border-[#22d3ee]/20 bg-[#0d0d12] px-4 py-2">
+					<div class="mx-auto flex max-w-[680px] flex-wrap items-center gap-2">
+						{#each attachedCourses as course (course.id)}
+							<div class="flex items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1">
+								<span class="text-[11px] text-[#22d3ee]">{course.name}</span>
+								<button
+									onclick={() => toggleCourse(course.id)}
+									class="text-[10px] text-[#64748b] transition hover:text-[#22d3ee]"
+								>
+									✕
+								</button>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<div class="border-t border-[#22d3ee]/40 bg-[#111] px-4 py-3">
+				<div class="mx-auto max-w-[520px]">
+					<ChatInput disabled={isStreaming} onSend={sendMessage}>
+				<div class="relative shrink-0">
+					<button
+						onclick={() => (coursePickerOpen = !coursePickerOpen)}
+						class="flex h-8 w-8 items-center justify-center border border-[#1f1f1f] bg-[#0d0d12] text-[#64748b] transition hover:border-[#22d3ee] hover:text-[#22d3ee]"
+						title="Attach courses"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-3.5 w-3.5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 4v16m8-8H4"
+							/>
+						</svg>
+					</button>
+
+					{#if coursePickerOpen}
+						<div
+							class="fixed inset-0 z-30"
+							onclick={() => (coursePickerOpen = false)}
+							onkeydown={(e) => e.key === 'Escape' && (coursePickerOpen = false)}
+							role="button"
+							tabindex="-1"
+						></div>
+
+						<div
+							class="absolute bottom-full left-0 z-40 mb-3 w-80 border border-[#1f1f1f] bg-[#0d0d12] shadow-xl"
+						>
+							<div class="border-b border-[#1f1f1f] px-4 py-3">
+								<p class="text-xs font-medium text-[#e2e8f0]">Course materials</p>
+								<p class="mt-1 text-[10px] text-[#475569]">
+									Upload a PDF or select attached courses to use as AI context
+								</p>
+							</div>
+
+							<div class="border-b border-[#1f1f1f] px-4 py-2">
+								<input
+									type="text"
+									bind:value={coursePickerSearch}
+									placeholder="Search courses or tags..."
+									style="caret-color:#22d3ee"
+									class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
+								/>
+							</div>
+
+							<div class="border-b border-[#1f1f1f] px-4 py-3">
+								<p class="mb-2 text-[10px] font-medium tracking-wider text-[#475569] uppercase">
+									Upload new
+								</p>
+								<div class="flex flex-col gap-2">
+									<input
+										type="text"
+										bind:value={uploadName}
+										placeholder="Course name (e.g. Java POO)"
+										style="caret-color:#22d3ee"
+										class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
+									/>
+									<input
+										type="text"
+										bind:value={uploadTags}
+										placeholder="Tags (comma-separated)"
+										style="caret-color:#22d3ee"
+										class="w-full border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#e2e8f0] placeholder-[#475569] focus:border-[#22d3ee] focus:outline-none"
+									/>
+									<div class="flex gap-2">
+										<label
+											class="flex cursor-pointer items-center gap-1.5 border border-[#1f1f1f] bg-[#0a0a0f] px-2.5 py-1.5 text-xs text-[#64748b] transition hover:border-[#22d3ee]"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-3 w-3"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+												/>
+											</svg>
+											{uploadFile ? uploadFile.name : 'Choose PDF'}
+											<input
+												type="file"
+												accept=".pdf"
+												class="hidden"
+												onchange={(e) => {
+													uploadFile = (e.target as HTMLInputElement).files?.[0] ?? null;
+												}}
+											/>
+										</label>
+										<button
+											onclick={uploadCourse}
+											disabled={uploading || !uploadFile || !uploadName.trim()}
+											class="bg-[#22d3ee] px-3 py-1.5 text-xs font-medium text-[#0a0a0f] transition hover:bg-[#67e8f9] disabled:opacity-30"
+										>
+											{uploading ? 'Uploading...' : 'Upload'}
+										</button>
+									</div>
+									{#if uploadError}
+										<p class="text-[10px] text-[#22d3ee]">{uploadError}</p>
+									{/if}
+								</div>
+							</div>
+
+							<div class="max-h-48 overflow-y-auto">
+								{#if filteredPickerCourses.length === 0}
+									<p class="px-4 py-4 text-[10px] text-[#475569]">
+										{availableCourses.length === 0 ? 'No courses uploaded yet — use the form above.' : 'No courses match your search.'}
+									</p>
+								{:else}
+									{#each filteredPickerCourses as course (course.id)}
+										<button
+											onclick={() => toggleCourse(course.id)}
+											class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-xs transition hover:bg-[#1a1a1a]"
+										>
+											<div
+												class="flex h-4 w-4 shrink-0 items-center justify-center border border-[#475569] {attachedCourseIds.includes(
+													course.id
+												)
+													? 'border-[#22d3ee] bg-[#22d3ee]'
+													: ''}"
+											>
+												{#if attachedCourseIds.includes(course.id)}
+													<svg
+														xmlns="http://www.w3.org/2000/svg"
+														class="h-3 w-3 text-[#0a0a0f]"
+														viewBox="0 0 20 20"
+														fill="currentColor"
+													>
+														<path
+															d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+														/>
+													</svg>
+												{/if}
+											</div>
+											<div class="min-w-0 flex-1">
+												<p class="truncate text-[#e2e8f0]">{course.name}</p>
+												<p class="truncate text-[#475569]">
+													{course.filename} &middot; {course.chunks} chunks
+												</p>
+												{#if course.tags?.length > 0}
+													<div class="mt-0.5 flex flex-wrap gap-0.5">
+														{#each course.tags as tag (tag)}
+															<span class="rounded border border-[#1f1f1f] bg-[#0a0a0f] px-1 py-px text-[9px] text-[#22d3ee]">{tag}</span>
+														{/each}
+													</div>
+												{/if}
+											</div>
+										</button>
+									{/each}
 								{/if}
 							</div>
 						</div>
-
-						<div class="max-h-48 overflow-y-auto">
-							{#if filteredPickerCourses.length === 0}
-								<p class="px-4 py-4 text-[10px] text-[#475569]">
-									{availableCourses.length === 0 ? 'No courses uploaded yet — use the form above.' : 'No courses match your search.'}
-								</p>
-							{:else}
-								{#each filteredPickerCourses as course (course.id)}
-									<button
-										onclick={() => toggleCourse(course.id)}
-										class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-xs transition hover:bg-[#1a1a1a]"
-									>
-										<div
-											class="flex h-4 w-4 shrink-0 items-center justify-center border border-[#475569] {attachedCourseIds.includes(
-												course.id
-											)
-												? 'border-[#22d3ee] bg-[#22d3ee]'
-												: ''}"
-										>
-											{#if attachedCourseIds.includes(course.id)}
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													class="h-3 w-3 text-[#0a0a0f]"
-													viewBox="0 0 20 20"
-													fill="currentColor"
-												>
-													<path
-														d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-													/>
-												</svg>
-											{/if}
-										</div>
-										<div class="min-w-0 flex-1">
-											<p class="truncate text-[#e2e8f0]">{course.name}</p>
-											<p class="truncate text-[#475569]">
-												{course.filename} &middot; {course.chunks} chunks
-											</p>
-											{#if course.tags?.length > 0}
-												<div class="mt-0.5 flex flex-wrap gap-0.5">
-													{#each course.tags as tag (tag)}
-														<span class="rounded border border-[#1f1f1f] bg-[#0a0a0f] px-1 py-px text-[9px] text-[#22d3ee]">{tag}</span>
-													{/each}
-												</div>
-											{/if}
-										</div>
-									</button>
-								{/each}
-							{/if}
-						</div>
-					</div>
-				{/if}
+					{/if}
+				</div>
+			</ChatInput>
+				</div>
 			</div>
-		</ChatInput>
-	</div>
+		</div>
+	{/if}
 {/if}
