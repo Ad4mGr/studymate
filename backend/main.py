@@ -407,6 +407,10 @@ async def import_course(req: Request):
         raise HTTPException(400, "Missing required fields: id, name")
 
     index = load_courses_index()
+
+    if course_id in index and index[course_id].get("user_id") != user_id:
+        raise HTTPException(403, "This course already exists and belongs to another user")
+
     index[course_id] = {
         "id": course_id,
         "name": name,

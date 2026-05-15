@@ -64,7 +64,7 @@ studymate/
 - **Multi-language** — AI responds in English, French, or Arabic
 - **ESPRIT-tuned** — System prompt tailored to Tunisian engineering curriculum
 
-## Phase 2 (planned)
+## Phase 2 (done)
 
 - RAG over ESPRIT course PDFs (ChromaDB)
 - Course browser & study planner

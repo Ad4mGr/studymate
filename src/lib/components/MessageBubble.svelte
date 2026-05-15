@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { marked } from 'marked';
+	import DOMPurify from 'dompurify';
 	import hljs from 'highlight.js/lib/core';
 	import javascript from 'highlight.js/lib/languages/javascript';
 	import python from 'highlight.js/lib/languages/python';
@@ -52,7 +53,11 @@
 	});
 
 	function renderContent(text: string) {
-		return marked.parse(text, { async: false });
+		const rawHtml = marked.parse(text, { async: false });
+		return DOMPurify.sanitize(rawHtml, {
+			ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr', 'span', 'div'],
+			ALLOWED_ATTR: ['class', 'href', 'target', 'rel', 'lang'],
+		});
 	}
 </script>
 
